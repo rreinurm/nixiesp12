@@ -131,6 +131,16 @@ def dump_time(hour, minute, second):
     bitbang_digit(second // 10)
     bitbang_digit(second % 10)
 
+def add_dst(year):
+    HHMarch   = time.mktime((year,3 ,(31-(int(5*year/4+4))%7),1,0,0,0,0,0)) #Time of March change to CEST
+    HHOctober = time.mktime((year,10,(31-(int(5*year/4+1))%7),1,0,0,0,0,0)) #Time of October change to CET
+    now=time.time()
+    if now < HHMarch :               # we are before last sunday of march
+        return 0
+    elif now < HHOctober :           # we are before last sunday of october
+        return 1
+    return 0
+
 # RTC accuracy is still garbage, time.ticks_ms() which is bound to CPU ticks seems to be more accurate
 # https://forum.micropython.org/viewtopic.php?t=3251#p19092
 
@@ -138,6 +148,8 @@ while True:
     if countdown <= 0:
         try:
             ticks_then, time_then = time.ticks_ms(), ntptime.time()
+            year = time.localtime(time_then)[0]
+            dst = add_dst(year)
         except OSError:
             print("Resync failed")
         else:
@@ -147,7 +159,7 @@ while True:
         year, month, day, hour, minute, second, _, _ = time.localtime(time_then + (time.ticks_ms() - ticks_then) // 1000)
         sleep_ms(500-(time.ticks_ms() - ticks_then) % 1000)
         blink = True
-        dump_time((hour + TIMEZONE) % 24, minute, second)
+        dump_time((hour + TIMEZONE + dst) % 24, minute, second)
         latch.on()
         latch.off()
         countdown -= 1
@@ -155,7 +167,7 @@ while True:
     year, month, day, hour, minute, second, _, _ = time.localtime(time_then + (time.ticks_ms() - ticks_then) // 1000)
     sleep_ms(1001-(time.ticks_ms() - ticks_then) % 1000)
     blink = False
-    dump_time((hour + TIMEZONE) % 24, minute, second)
+    dump_time((hour + TIMEZONE + dst) % 24, minute, second)
     latch.on()
     latch.off()
 
